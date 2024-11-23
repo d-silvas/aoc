@@ -6,22 +6,21 @@ use std::time::{Duration, Instant};
 fn main() {
     let input_text: &str = include_str!("input/input.txt");
 
-    let perf_02_start: Instant = Instant::now();
-    let part_02_result: i64 = run_bad(input_text).expect("Should have worked");
-    println!("2nd PART RESULT: {}", part_02_result);
-    let perf_02_duration: Duration = perf_02_start.elapsed();
-    println!("2nd part execution time: {:.2?}", perf_02_duration);
+    let start_bad: Instant = Instant::now();
+    let result_bad: i64 = run_bad(input_text).expect("Should have worked");
+    let duration_bad: Duration = start_bad.elapsed();
+
+    println!("Bad result: {}", result_bad);
+    println!("Bad execution time: {:.2?}", duration_bad);
 
     println!();
 
-    let perf_02_good_start: Instant = Instant::now();
-    let part_02_good_result: i64 = run(input_text).expect("Should have worked");
-    println!("2nd PART GOOD RESULT: {}", part_02_good_result);
-    let perf_02_good_duration: Duration = perf_02_good_start.elapsed();
-    println!(
-        "2nd part good execution time: {:.2?}",
-        perf_02_good_duration
-    );
+    let start: Instant = Instant::now();
+    let result: i64 = run(input_text).expect("Should have worked");
+    let duration: Duration = start.elapsed();
+
+    println!("Result: {}", result);
+    println!("Execution time: {:.2?}", duration);
 }
 
 /**

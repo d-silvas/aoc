@@ -3,13 +3,13 @@ use std::io;
 use std::time::{Duration, Instant};
 
 fn main() {
-    let start: Instant = Instant::now();
-
     let input_text: &str = include_str!("input/input.txt");
-    let result: i64 = run(input_text).expect("Should have worked");
-    println!("Result: {}", result);
 
+    let start: Instant = Instant::now();
+    let result: i64 = run(input_text).expect("Should have worked");
     let duration: Duration = start.elapsed();
+
+    println!("Result: {}", result);
     println!("Execution time: {:.2?}", duration);
 }
 
