@@ -1,6 +1,6 @@
-use regex::Regex;
 use std::io;
 use std::time::{Duration, Instant};
+mod common;
 
 fn main() {
     let input_text = include_str!("input/input.txt");
@@ -13,16 +13,8 @@ fn main() {
     println!("Execution time: {:.2?}", duration);
 }
 
-#[derive(Debug)]
-struct Draw {
-    game_id: i32,
-    red: i32,
-    green: i32,
-    blue: i32,
-}
-
 struct Game {
-    draws: Vec<Draw>,
+    draws: Vec<common::Draw>,
 }
 
 trait CubeCount {
@@ -57,44 +49,20 @@ fn run(input_text: &str) -> io::Result<i32> {
     for (current_index, line) in input_text.lines().enumerate() {
         let game_id = current_index as i32 + 1;
         let game = Game {
-            draws: draws_from_string(line, game_id),
+            draws: common::draws_from_string(line, game_id),
         };
         games.push(game);
     }
     Ok(games.iter().map(|g| g.power()).sum())
 }
 
-fn draws_from_string(draws_str: &str, game_id: i32) -> Vec<Draw> {
-    let index_regex: Regex = Regex::new(r#"Game \d+:"#).unwrap();
-    let blue_regex = Regex::new(r#"(?<blue>\d+) blue"#).unwrap();
-    let red_regex = Regex::new(r#"(?<red>\d+) red"#).unwrap();
-    let green_regex = Regex::new(r#"(?<green>\d+) green"#).unwrap();
-    // We could have used the row index that comes from the file,
-    // but we are using the loop index instead
-    let str = index_regex.replace_all(draws_str, "");
-    let draws_str = str.split(';');
-    let mut draws_vec: Vec<Draw> = Vec::new();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for g in draws_str {
-        let blue = match blue_regex.captures(g) {
-            Some(caps) => caps["blue"].parse::<i32>().unwrap(),
-            None => 0_i32,
-        };
-        let red = match red_regex.captures(g) {
-            Some(caps) => caps["red"].parse::<i32>().unwrap(),
-            None => 0_i32,
-        };
-        let green = match green_regex.captures(g) {
-            Some(caps) => caps["green"].parse::<i32>().unwrap(),
-            None => 0_i32,
-        };
-        let draw = Draw {
-            game_id,
-            blue,
-            red,
-            green,
-        };
-        draws_vec.push(draw);
+    #[test]
+    fn test_run() {
+        let test_text: &str = include_str!("input/test.txt");
+        assert_eq!(2286i32, run(test_text).unwrap());
     }
-    draws_vec
 }
