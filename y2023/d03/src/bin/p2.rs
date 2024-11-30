@@ -1,14 +1,6 @@
-use itertools::Itertools;
-use regex::Regex;
 use std::collections::HashMap;
 use std::io;
 use std::time::{Duration, Instant};
-
-/**
- * Some changes in approach
- *  1. We are only going to consider "part numbers" the numbers that are adjacent to * symbols. We
- *      don't care if a number is adjacent to symbols like ? or $.
- */
 
 fn main() {
     let input_text = include_str!("input/input.txt");
@@ -28,7 +20,7 @@ struct Position {
     col: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 struct NumberDigit {
     digit: u8,
     position: Position,
@@ -252,22 +244,35 @@ impl NumberDigit {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone)]
 struct Number {
     digits: Vec<NumberDigit>,
 }
 
+impl Number {
+    pub fn new() -> Self {
+        Number { digits: vec![] }
+    }
+}
+
 trait NumberTrait {
     fn add_digit(&mut self, position: Position, all_chars: &Vec<Vec<char>>);
-    // fn set_as_part_num(&mut self);
-    // fn to_string(&self) -> String;
-    // fn digits_to_int(&self) -> u32;
+    // TODO it might be possible to transform Number to i32 by implementing the Into or From traits
+    fn digits_to_int(&self) -> u32;
     fn get_all_adjacent_asterisk_positions(&self) -> Vec<Position>;
 }
 
 impl NumberTrait for Number {
     fn add_digit(&mut self, position: Position, all_chars: &Vec<Vec<char>>) {
         self.digits.push(NumberDigit::new(position, all_chars));
+    }
+
+    fn digits_to_int(&self) -> u32 {
+        let mut result: u32 = 0;
+        for (digit_index, digit) in self.digits.iter().rev().enumerate() {
+            result += digit.digit as u32 * 10_u32.pow(digit_index as u32);
+        }
+        result
     }
 
     fn get_all_adjacent_asterisk_positions(&self) -> Vec<Position> {
@@ -277,22 +282,6 @@ impl NumberTrait for Number {
         }
         result
     }
-
-    // fn set_as_part_num(&mut self) {
-    //     self.is_part_num = true;
-    // }
-    //
-    // fn to_string(&self) -> String {
-    //     self.digits.iter().map(|d| d.to_string()).join("") + "|" + &self.is_part_num.to_string()
-    // }
-    //
-    // fn digits_to_int(&self) -> u32 {
-    //     let mut result: u32 = 0;
-    //     for (digit_index, digit) in self.digits.iter().rev().enumerate() {
-    //         result += digit * 10_u32.pow(digit_index as u32);
-    //     }
-    //     result
-    // }
 }
 
 impl PartialEq for Number {
@@ -311,54 +300,65 @@ fn run(input_text: &str) -> io::Result<u32> {
 
     // Get all numbers, and for each of them, save the position of all surrounding '*'
     let all_numbers = get_all_numbers(&all_chars);
-    // .iter()
-    // Discard the numbers that have no surrounding '*'
-    // .filter(|&n| n.get_all_adjacent_asterisk_positions().len() > 0)
-    // .map(|n| *n)
-    // .collect::<Vec<Number>>();
 
     // Now we have to reverse the assignment: for each asterisk, we need to find the numbers that
     // are surrounding it
     let mut asterisks_to_numbers: HashMap<Position, Vec<Number>> = HashMap::new();
-    for mut number in all_numbers {
+    for number in all_numbers {
         for asterisk_position in number.get_all_adjacent_asterisk_positions() {
             if asterisks_to_numbers.contains_key(&asterisk_position) {
                 if !(asterisks_to_numbers
                     .get(&asterisk_position)
                     .unwrap()
-                    .contains(&number))
+                    .contains(&&number))
                 {
                     asterisks_to_numbers
                         .get_mut(&asterisk_position)
                         .unwrap()
-                        .push(number);
+                        .push(number.clone());
                 }
+            } else {
+                let number_vec = vec![number.clone()];
+                asterisks_to_numbers.insert(asterisk_position, number_vec);
             }
         }
     }
 
-    // Ok(all_numbers
-    //     .iter()
-    //     .filter(|n| n.is_part_num)
-    //     .map(|n| n.digits_to_int())
-    //     .sum())
-    Ok(1u32)
+    let result: u32 = asterisks_to_numbers
+        // We don't care about asterisk positions here so we take the values only
+        // https://stackoverflow.com/questions/56724014/how-do-i-collect-the-values-of-a-hashmap-into-a-vector#comment131100540_63727456
+        .into_values()
+        // Only consider the cases where an asterisk had 2 adjacent numbers (those asterisks were "gears")
+        .filter(|numbers: &Vec<Number>| numbers.len() == 2)
+        // We get a Vec<Vec<Number>> where each inner Vec has exactly 2 Numbers
+        .map(|numbers| {
+            numbers
+                .iter()
+                // Map each Number to u32
+                .map(|n| n.digits_to_int())
+                // Here we have an array of 2 u32, which are the 2 numbers which are adjacent to one gear
+                .collect::<Vec<u32>>()
+                .iter()
+                // We multiply these 2 u32
+                .fold(1_u32, |acc: u32, x: &u32| acc * x)
+        })
+        // Here we have an array of u32. Each element of this array is the multiplication of the 2
+        // part numbers that were adjacent to a gear.
+        .collect::<Vec<u32>>()
+        .into_iter()
+        // And finally, we sum all these quantities
+        .sum();
+
+    Ok(result)
 }
 
-/**
- * Please note: minimum size of all_chars is 2x2
- */
 fn get_all_numbers(all_chars: &Vec<Vec<char>>) -> Vec<Number> {
     let mut all_numbers: Vec<Number> = Vec::new();
     for (row_index, row) in all_chars.iter().enumerate() {
         let mut is_prev_char_a_digit = false;
         for (col_index, ch) in row.iter().enumerate() {
-            if *ch == '.' {
-                is_prev_char_a_digit = false;
-                continue;
-            }
             match ch.to_digit(10) {
-                Some(num) => {
+                Some(_) => {
                     let curr_position = Position {
                         row: row_index,
                         col: col_index,
@@ -366,17 +366,8 @@ fn get_all_numbers(all_chars: &Vec<Vec<char>>) -> Vec<Number> {
                     if is_prev_char_a_digit {
                         let last_num = all_numbers.last_mut().unwrap();
                         last_num.add_digit(curr_position, &all_chars);
-                        // If we have already found previously that the last Number was a part number,
-                        // we don't have to make that calculation again
-                        // if !last_num.is_part_num
-                        //     && is_adjacent_to_symbol_num(&curr_position, &all_chars)
-                        // {
-                        //     last_num.set_as_part_num();
-                        // }
                     } else {
-                        // let is_part_num = is_adjacent_to_symbol_num(&curr_position, &all_chars);
-                        // TODO constructor without digits.
-                        let mut new_number = Number { digits: vec![] };
+                        let mut new_number = Number::new();
                         new_number.add_digit(curr_position, &all_chars);
                         all_numbers.push(new_number)
                     }
@@ -391,42 +382,13 @@ fn get_all_numbers(all_chars: &Vec<Vec<char>>) -> Vec<Number> {
     all_numbers
 }
 
-fn is_symbol(ch: char) -> bool {
-    // We are compiling the Regex on every call...
-    let symbol_regex = Regex::new(r"[^\d.\s]").unwrap();
-    symbol_regex.is_match(&ch.to_string())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // #[test]
-    // fn it_works_example() {
-    //     assert_eq!(
-    //         nums_to_string(&get_all_numbers(&vec![
-    //             vec!['4', '6', '7', '.', '.', '1', '1', '4', '.', '.'],
-    //             vec!['.', '.', '.', '*', '.', '.', '.', '.', '.', '.'],
-    //             vec!['.', '.', '3', '5', '.', '.', '6', '3', '3', '.'],
-    //             vec!['.', '.', '.', '.', '.', '.', '#', '.', '.', '.'],
-    //             vec!['6', '1', '7', '*', '.', '.', '.', '.', '.', '.'],
-    //             vec!['.', '.', '.', '.', '.', '+', '.', '5', '8', '.'],
-    //             vec!['.', '.', '5', '9', '2', '.', '.', '.', '.', '.'],
-    //             vec!['.', '.', '.', '.', '.', '.', '7', '5', '5', '.'],
-    //             vec!['.', '.', '.', '$', '.', '*', '.', '.', '.', '.'],
-    //             vec!['.', '6', '6', '4', '.', '5', '9', '8', '.', '.'],
-    //         ])),
-    //         "467|true,114|false,35|true,633|true,617|true,58|false,592|true,755|true,664|true,598|true"
-    //     );
-    // }
-
     #[test]
     fn test_run() {
         let test_text: &str = include_str!("input/test.txt");
-        assert_eq!(4361u32, run(test_text).unwrap());
+        assert_eq!(467835u32, run(test_text).unwrap());
     }
-
-    // fn nums_to_string(all_numbers: &Vec<Number>) -> String {
-    //     all_numbers.iter().map(|n| n.to_string()).join(",")
-    // }
 }
